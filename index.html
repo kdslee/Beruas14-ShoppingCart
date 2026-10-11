@@ -365,6 +365,12 @@
         document.getElementById("historyModal").classList.add("hidden");
       };
 
+      window.deleteHistoryItem = (id) => {
+        if (confirm("Are you sure you want to delete this shopping record?")) {
+          remove(ref(db, `groceries/history/${id}`));
+        }
+      };
+
       function renderItems() {
         const listEl = document.getElementById("itemList");
         const entries = Object.entries(currentItems);
@@ -484,8 +490,8 @@
               <tr class="border-b border-slate-200 text-slate-500 uppercase text-[10px] tracking-wider">
                 <th class="py-2 px-1">Date & Time</th>
                 <th class="py-2 px-1 text-center">Items</th>
-                <th class="py-2 px-1 text-right">Budget</th>
-                <th class="py-2 px-1 text-right">Total Spent</th>
+                <th class="py-2 px-1 text-right">Spent</th>
+                <th class="py-2 px-1 text-center w-8">Delete</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
@@ -493,7 +499,6 @@
 
         records.forEach(([id, rec]) => {
           const itemCount = Array.isArray(rec.items) ? rec.items.length : 0;
-          const budgetVal = Number(rec.budgetSet) > 0 ? `RM ${Number(rec.budgetSet).toFixed(2)}` : "—";
           const spentVal = Number(rec.totalSpent || 0).toFixed(2);
           const isOver = Number(rec.budgetSet) > 0 && Number(rec.totalSpent) > Number(rec.budgetSet);
 
@@ -501,9 +506,13 @@
             <tr class="hover:bg-slate-50">
               <td class="py-2.5 px-1 font-semibold text-slate-800">${rec.displayDate || "—"}</td>
               <td class="py-2.5 px-1 text-center text-slate-500 font-medium">${itemCount}</td>
-              <td class="py-2.5 px-1 text-right text-slate-400">${budgetVal}</td>
               <td class="py-2.5 px-1 text-right font-bold ${isOver ? 'text-rose-600' : 'text-emerald-600'}">
                 RM ${spentVal}
+              </td>
+              <td class="py-2.5 px-1 text-center">
+                <button onclick="deleteHistoryItem('${id}')" title="Delete record" class="text-slate-300 hover:text-rose-500 active:scale-90 p-1 font-bold text-sm transition">
+                  🗑️
+                </button>
               </td>
             </tr>
           `;

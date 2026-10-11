@@ -11,7 +11,7 @@
   <meta name="theme-color" content="#059669" />
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-slate-100 min-h-screen text-slate-800 font-sans pb-32">
+<body class="bg-slate-100 min-h-screen text-slate-800 font-sans pb-36">
 
   <!-- PIN LOCK OVERLAY -->
   <div id="pinOverlay" class="fixed inset-0 bg-slate-900/90 z-50 flex items-center justify-center p-4">
@@ -28,17 +28,70 @@
     </div>
   </div>
 
+  <!-- PURCHASE CONFIRMATION MODAL -->
+  <div id="confirmModal" class="fixed inset-0 bg-slate-900/75 z-40 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl p-5 max-w-xs w-full shadow-2xl space-y-4 text-center">
+      <div class="text-3xl">🧾</div>
+      <h3 class="text-base font-bold text-slate-900">Finalize Shopping Trip?</h3>
+      <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 text-left space-y-1 text-xs">
+        <div class="flex justify-between">
+          <span class="text-slate-500">Items bought:</span>
+          <span id="confirmItemCount" class="font-bold text-slate-800">0</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500">Total Spent:</span>
+          <span id="confirmTotalSpent" class="font-bold text-emerald-600 text-sm">RM 0.00</span>
+        </div>
+      </div>
+      <p class="text-[11px] text-slate-500">This will save the trip to your history and clear bought items from the cart.</p>
+      <div class="flex gap-2">
+        <button onclick="closeConfirmModal()" class="flex-1 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition">
+          Cancel
+        </button>
+        <button onclick="recordAndFinalizePurchase()" class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition shadow">
+          Confirm
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORY TABLE MODAL -->
+  <div id="historyModal" class="fixed inset-0 bg-slate-900/75 z-40 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="px-5 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+        <div class="flex items-center space-x-2">
+          <span class="text-xl">📊</span>
+          <h3 class="text-sm font-bold text-slate-800">Past Spending Records</h3>
+        </div>
+        <button onclick="closeHistoryModal()" class="text-slate-400 hover:text-slate-600 font-bold text-lg p-1">✕</button>
+      </div>
+      <div class="overflow-y-auto p-4 flex-1">
+        <div id="historyTableContainer">
+          <!-- Table injected here -->
+        </div>
+      </div>
+      <div class="p-3 border-t border-slate-200 bg-slate-50 text-right">
+        <button onclick="closeHistoryModal()" class="px-4 py-2 bg-slate-700 text-white text-xs font-bold rounded-xl">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MAIN APP CONTAINER -->
   <div id="appContainer" class="hidden">
     <!-- Top Bar -->
-    <header class="bg-emerald-600 text-white px-4 py-3.5 sticky top-0 shadow-md z-10 flex justify-between items-center">
+    <header class="bg-emerald-600 text-white px-4 py-3 sticky top-0 shadow-md z-10 flex justify-between items-center">
       <div>
         <h1 class="text-base font-extrabold tracking-tight">🛒 House Groceries</h1>
         <p class="text-[10px] text-emerald-100 uppercase tracking-widest font-semibold">Live Budget Sync</p>
       </div>
-      <button onclick="clearCompleted()" class="text-xs bg-emerald-700 hover:bg-emerald-800 active:scale-95 px-3 py-1.5 rounded-lg font-semibold transition">
-        Clear Done
-      </button>
+      <div class="flex items-center space-x-2">
+        <button onclick="openHistoryModal()" class="text-xs bg-emerald-700 hover:bg-emerald-800 px-2.5 py-1.5 rounded-lg font-semibold transition">
+          📊 History
+        </button>
+        <button onclick="clearCompleted()" class="text-xs bg-emerald-800/80 hover:bg-emerald-900 px-2.5 py-1.5 rounded-lg font-semibold transition">
+          Clear Done
+        </button>
+      </div>
     </header>
 
     <main class="max-w-md mx-auto p-4 space-y-4">
@@ -49,7 +102,7 @@
           <span class="text-[11px] text-slate-400">Total spending ceiling</span>
         </div>
         <div class="flex items-center space-x-1">
-          <span class="text-slate-400 font-bold">$</span>
+          <span class="text-slate-500 font-bold text-xs">RM</span>
           <input id="budgetInput" type="number" step="0.01" placeholder="0.00" onchange="updateBudget(this.value)"
                  class="w-24 border border-slate-300 rounded-xl px-2.5 py-1.5 text-right font-extrabold text-slate-800 focus:outline-emerald-500" />
         </div>
@@ -57,7 +110,7 @@
 
       <!-- Add Item Input -->
       <form onsubmit="addItem(event)" class="flex gap-2">
-        <input id="itemInput" type="text" placeholder="Add grocery item (e.g., Milk)..." required
+        <input id="itemInput" type="text" placeholder="Add item (e.g., Eggs, Rice)..." required
                class="flex-1 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm shadow-sm focus:outline-emerald-500 bg-white" />
         <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold px-4 py-2.5 rounded-xl text-sm shadow transition">
           + Add
@@ -70,18 +123,21 @@
       </div>
     </main>
 
-    <!-- Sticky Bottom Budget Bar -->
-    <div id="budgetBar" class="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-white border-t border-slate-200 shadow-2xl transition-all duration-300">
-      <div class="flex justify-between items-center">
+    <!-- Sticky Bottom Budget & Finalize Bar -->
+    <div id="budgetBar" class="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-3.5 bg-white border-t border-slate-200 shadow-2xl transition-all duration-300">
+      <div class="flex justify-between items-center mb-2.5">
         <div>
           <p class="text-[10px] text-slate-400 uppercase font-black tracking-wider">Cart Total</p>
-          <p id="totalDisplay" class="text-2xl font-black text-slate-900 leading-tight">$0.00</p>
+          <p id="totalDisplay" class="text-xl font-black text-slate-900 leading-tight">RM 0.00</p>
         </div>
         <div class="text-right">
           <p id="budgetStatusLabel" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Remaining</p>
-          <p id="remainingDisplay" class="text-lg font-black text-emerald-600 leading-tight">—</p>
+          <p id="remainingDisplay" class="text-base font-black text-emerald-600 leading-tight">—</p>
         </div>
       </div>
+      <button onclick="openConfirmModal()" class="w-full bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold py-2.5 rounded-xl text-xs uppercase tracking-wider shadow transition">
+        Finalize Purchase
+      </button>
     </div>
   </div>
 
@@ -89,13 +145,11 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
     import { 
-      getDatabase, ref, push, set, update, remove, onValue, get, query, orderByChild, endAt 
+      getDatabase, ref, push, set, update, remove, onValue, get 
     } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
 
-    // 1. CHANGE THIS TO YOUR HOUSEHOLD CODE:
     const HOUSEHOLD_PIN = "1414";
 
-    // 2. PASTE YOUR EXACT FIREBASE CONFIG HERE:
     const firebaseConfig = {
       apiKey: "AIzaSyDf6M_EKU68d9NkuCwPhgeEIdh5izXFOdQ",
       authDomain: "beruas-14-shopping-web-app.firebaseapp.com",
@@ -106,7 +160,6 @@
       appId: "1:395307163932:web:5515c8cd9706cbafa99ad9"
     };
 
-    // PIN Authentication Handler
     window.verifyPin = () => {
       const input = document.getElementById("pinInputField").value.trim();
       if (input === HOUSEHOLD_PIN) {
@@ -119,7 +172,6 @@
       }
     };
 
-    // Auto-login if previously verified on this device
     if (localStorage.getItem("grocery_unlocked") === "true") {
       document.getElementById("pinOverlay").classList.add("hidden");
       document.getElementById("appContainer").classList.remove("hidden");
@@ -132,43 +184,51 @@
 
       const itemsRef = ref(db, "groceries/items");
       const budgetRef = ref(db, "groceries/budget");
+      const historyRef = ref(db, "groceries/history");
 
       let currentItems = {};
       let currentBudget = 0;
+      let currentHistory = {};
 
-      // Realtime listener for budget limit
       onValue(budgetRef, (snapshot) => {
         currentBudget = snapshot.val() || 0;
         document.getElementById("budgetInput").value = currentBudget > 0 ? currentBudget : "";
         calculateTotals();
       });
 
-      // Realtime listener for grocery items
       onValue(itemsRef, (snapshot) => {
         currentItems = snapshot.val() || {};
         renderItems();
         calculateTotals();
       });
 
-      // Automatically purge items completed > 30 days ago
+      onValue(historyRef, (snapshot) => {
+        currentHistory = snapshot.val() || {};
+        renderHistory();
+      });
+
+      // Safe Purge: Only touches items that are ticked AND older than 30 days
       function purgeOldCompletedItems() {
         const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
         const cutoffTime = Date.now() - THIRTY_DAYS_MS;
 
-        const expiredQuery = query(itemsRef, orderByChild("completedAt"), endAt(cutoffTime));
-        get(expiredQuery).then((snapshot) => {
+        get(itemsRef).then((snapshot) => {
           if (snapshot.exists()) {
             const updates = {};
             snapshot.forEach((child) => {
-              updates[`groceries/items/${child.key}`] = null;
+              const item = child.val();
+              if (item && item.checked === true && typeof item.completedAt === 'number' && item.completedAt < cutoffTime) {
+                updates[`groceries/items/${child.key}`] = null;
+              }
             });
-            update(ref(db), updates);
+            if (Object.keys(updates).length > 0) {
+              update(ref(db), updates);
+            }
           }
         }).catch(() => {});
       }
       purgeOldCompletedItems();
 
-      // UI Actions
       window.updateBudget = (val) => {
         const num = parseFloat(val) || 0;
         set(budgetRef, num);
@@ -184,6 +244,7 @@
           name: name, 
           checked: false, 
           price: 0, 
+          qty: 1,
           completedAt: null 
         });
         input.value = "";
@@ -198,8 +259,21 @@
       };
 
       window.updatePrice = (id, val) => {
-        const price = parseFloat(val) || 0;
+        const price = Math.max(0, parseFloat(val) || 0);
         update(ref(db, `groceries/items/${id}`), { price: price });
+      };
+
+      window.changeQty = (id, delta) => {
+        const item = currentItems[id];
+        if (!item) return;
+        const currentQty = parseInt(item.qty) || 1;
+        const newQty = Math.max(1, currentQty + delta);
+        update(ref(db, `groceries/items/${id}`), { qty: newQty });
+      };
+
+      window.setQty = (id, val) => {
+        const parsed = Math.max(1, parseInt(val) || 1);
+        update(ref(db, `groceries/items/${id}`), { qty: parsed });
       };
 
       window.deleteItem = (id) => {
@@ -214,6 +288,83 @@
         });
       };
 
+      // Modal Triggers
+      window.openConfirmModal = () => {
+        let total = 0;
+        let count = 0;
+        Object.values(currentItems).forEach((item) => {
+          if (item.checked) {
+            count += 1;
+            total += (Number(item.price) || 0) * (parseInt(item.qty) || 1);
+          }
+        });
+
+        if (count === 0) {
+          alert("Please check off at least one purchased item before finalizing!");
+          return;
+        }
+
+        document.getElementById("confirmItemCount").textContent = `${count} item(s)`;
+        document.getElementById("confirmTotalSpent").textContent = `RM ${total.toFixed(2)}`;
+        document.getElementById("confirmModal").classList.remove("hidden");
+      };
+
+      window.closeConfirmModal = () => {
+        document.getElementById("confirmModal").classList.add("hidden");
+      };
+
+      window.recordAndFinalizePurchase = () => {
+        let total = 0;
+        const purchasedList = [];
+        const itemDeletions = {};
+
+        Object.entries(currentItems).forEach(([id, item]) => {
+          if (item.checked) {
+            const itemQty = parseInt(item.qty) || 1;
+            const itemPrice = Number(item.price) || 0;
+            const subtotal = itemPrice * itemQty;
+            total += subtotal;
+            purchasedList.push({
+              name: item.name,
+              qty: itemQty,
+              price: itemPrice,
+              subtotal: subtotal
+            });
+            itemDeletions[`groceries/items/${id}`] = null;
+          }
+        });
+
+        const newRecordRef = push(historyRef);
+        const now = new Date();
+        const formattedDate = now.toLocaleDateString("en-MY", { 
+          day: "2-digit", month: "short", year: "numeric" 
+        });
+        const formattedTime = now.toLocaleTimeString("en-MY", { 
+          hour: "2-digit", minute: "2-digit", hour12: true 
+        });
+
+        set(newRecordRef, {
+          timestamp: Date.now(),
+          displayDate: `${formattedDate}, ${formattedTime}`,
+          totalSpent: total,
+          budgetSet: currentBudget,
+          items: purchasedList
+        }).then(() => {
+          // Clear checked items from cart
+          update(ref(db), itemDeletions);
+          closeConfirmModal();
+        });
+      };
+
+      window.openHistoryModal = () => {
+        renderHistory();
+        document.getElementById("historyModal").classList.remove("hidden");
+      };
+
+      window.closeHistoryModal = () => {
+        document.getElementById("historyModal").classList.add("hidden");
+      };
+
       function renderItems() {
         const listEl = document.getElementById("itemList");
         const entries = Object.entries(currentItems);
@@ -225,27 +376,54 @@
 
         listEl.innerHTML = "";
         entries.forEach(([id, item]) => {
+          const qty = parseInt(item.qty) || 1;
+          const unitPrice = Number(item.price) || 0;
+          const subtotal = unitPrice * qty;
+
           const div = document.createElement("div");
-          div.className = `flex items-center justify-between p-3 rounded-2xl border transition-all ${
+          div.className = `p-3 rounded-2xl border transition-all ${
             item.checked ? "bg-emerald-50 border-emerald-300" : "bg-white border-slate-200 shadow-sm"
           }`;
 
           div.innerHTML = `
-            <div class="flex items-center space-x-3 flex-1 overflow-hidden pr-2">
-              <input type="checkbox" ${item.checked ? "checked" : ""} onchange="toggleCheck('${id}', ${item.checked})"
-                     class="w-5 h-5 accent-emerald-600 rounded-md cursor-pointer" />
-              <span class="text-sm font-semibold truncate ${item.checked ? "line-through text-slate-400" : "text-slate-800"}">
-                ${item.name}
-              </span>
-            </div>
-            <div class="flex items-center space-x-2">
-              <div class="relative w-20">
-                <span class="absolute left-2 top-2 text-xs text-slate-400 font-bold">$</span>
-                <input type="number" step="0.01" placeholder="0.00" value="${item.price > 0 ? item.price : ""}"
-                       onchange="updatePrice('${id}', this.value)"
-                       class="w-full text-right text-xs font-bold border border-slate-300 rounded-xl py-2 pr-2.5 pl-4 focus:outline-emerald-500 bg-white" />
+            <div class="flex items-center justify-between">
+              <!-- Checkbox & Item Name -->
+              <div class="flex items-center space-x-3 flex-1 overflow-hidden pr-2">
+                <input type="checkbox" ${item.checked ? "checked" : ""} onchange="toggleCheck('${id}', ${item.checked})"
+                       class="w-5 h-5 accent-emerald-600 rounded-md cursor-pointer flex-shrink-0" />
+                <span class="text-sm font-semibold truncate ${item.checked ? "line-through text-slate-400" : "text-slate-800"}">
+                  ${item.name}
+                </span>
               </div>
               <button onclick="deleteItem('${id}')" class="text-slate-300 hover:text-rose-500 active:scale-95 p-1 font-bold">✕</button>
+            </div>
+
+            <!-- Quantity & Price Row -->
+            <div class="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+              <!-- Qty Stepper -->
+              <div class="flex items-center space-x-1.5">
+                <span class="text-slate-400 font-semibold text-[11px]">Qty:</span>
+                <div class="flex items-center border border-slate-200 rounded-lg overflow-hidden bg-white">
+                  <button onclick="changeQty('${id}', -1)" class="px-2 py-1 text-slate-600 hover:bg-slate-100 font-bold active:bg-slate-200">-</button>
+                  <input type="number" min="1" value="${qty}" onchange="setQty('${id}', this.value)"
+                         class="w-8 text-center text-xs font-bold text-slate-700 py-1 focus:outline-none" />
+                  <button onclick="changeQty('${id}', 1)" class="px-2 py-1 text-slate-600 hover:bg-slate-100 font-bold active:bg-slate-200">+</button>
+                </div>
+              </div>
+
+              <!-- Unit Price and Subtotal -->
+              <div class="flex items-center space-x-2">
+                <div class="relative w-24">
+                  <span class="absolute left-2 top-1.5 text-[11px] text-slate-400 font-bold">RM</span>
+                  <input type="number" step="0.01" placeholder="0.00" value="${unitPrice > 0 ? unitPrice : ""}"
+                         onchange="updatePrice('${id}', this.value)"
+                         class="w-full text-right text-xs font-bold border border-slate-200 rounded-lg py-1 pr-2 pl-7 focus:outline-emerald-500 bg-white" />
+                </div>
+                <div class="text-right min-w-[70px]">
+                  <span class="text-[10px] text-slate-400 block">Total</span>
+                  <span class="font-extrabold text-xs text-slate-700">RM ${subtotal.toFixed(2)}</span>
+                </div>
+              </div>
             </div>
           `;
           listEl.appendChild(div);
@@ -255,12 +433,14 @@
       function calculateTotals() {
         let total = 0;
         Object.values(currentItems).forEach((item) => {
-          if (item.checked && item.price) {
-            total += Number(item.price);
+          if (item.checked) {
+            const qty = parseInt(item.qty) || 1;
+            const price = Number(item.price) || 0;
+            total += price * qty;
           }
         });
 
-        document.getElementById("totalDisplay").textContent = `$${total.toFixed(2)}`;
+        document.getElementById("totalDisplay").textContent = `RM ${total.toFixed(2)}`;
         const bar = document.getElementById("budgetBar");
         const remDisplay = document.getElementById("remainingDisplay");
         const statusLabel = document.getElementById("budgetStatusLabel");
@@ -268,25 +448,69 @@
         if (currentBudget > 0) {
           const diff = currentBudget - total;
           if (diff < 0) {
-            bar.className = "fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-rose-50 border-t-2 border-rose-500 shadow-2xl transition-all duration-300";
+            bar.className = "fixed bottom-0 left-0 right-0 max-w-md mx-auto p-3.5 bg-rose-50 border-t-2 border-rose-500 shadow-2xl transition-all duration-300";
             statusLabel.textContent = "Over Budget";
             statusLabel.className = "text-[10px] font-black text-rose-600 uppercase tracking-wider";
-            remDisplay.textContent = `+$${Math.abs(diff).toFixed(2)}`;
-            remDisplay.className = "text-lg font-black text-rose-600 leading-tight";
+            remDisplay.textContent = `+RM ${Math.abs(diff).toFixed(2)}`;
+            remDisplay.className = "text-base font-black text-rose-600 leading-tight";
           } else {
-            bar.className = "fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-white border-t border-slate-200 shadow-2xl transition-all duration-300";
+            bar.className = "fixed bottom-0 left-0 right-0 max-w-md mx-auto p-3.5 bg-white border-t border-slate-200 shadow-2xl transition-all duration-300";
             statusLabel.textContent = "Remaining";
             statusLabel.className = "text-[10px] font-bold text-slate-400 uppercase tracking-wider";
-            remDisplay.textContent = `$${diff.toFixed(2)}`;
-            remDisplay.className = "text-lg font-black text-emerald-600 leading-tight";
+            remDisplay.textContent = `RM ${diff.toFixed(2)}`;
+            remDisplay.className = "text-base font-black text-emerald-600 leading-tight";
           }
         } else {
-          bar.className = "fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-white border-t border-slate-200 shadow-2xl transition-all duration-300";
+          bar.className = "fixed bottom-0 left-0 right-0 max-w-md mx-auto p-3.5 bg-white border-t border-slate-200 shadow-2xl transition-all duration-300";
           statusLabel.textContent = "Remaining";
           statusLabel.className = "text-[10px] font-bold text-slate-400 uppercase tracking-wider";
           remDisplay.textContent = "—";
-          remDisplay.className = "text-lg font-black text-slate-400 leading-tight";
+          remDisplay.className = "text-base font-black text-slate-400 leading-tight";
         }
+      }
+
+      function renderHistory() {
+        const container = document.getElementById("historyTableContainer");
+        const records = Object.entries(currentHistory).sort((a, b) => b[1].timestamp - a[1].timestamp);
+
+        if (records.length === 0) {
+          container.innerHTML = `<p class="text-center text-xs text-slate-400 py-8">No purchase history recorded yet.</p>`;
+          return;
+        }
+
+        let tableHtml = `
+          <table class="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr class="border-b border-slate-200 text-slate-500 uppercase text-[10px] tracking-wider">
+                <th class="py-2 px-1">Date & Time</th>
+                <th class="py-2 px-1 text-center">Items</th>
+                <th class="py-2 px-1 text-right">Budget</th>
+                <th class="py-2 px-1 text-right">Total Spent</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+        `;
+
+        records.forEach(([id, rec]) => {
+          const itemCount = Array.isArray(rec.items) ? rec.items.length : 0;
+          const budgetVal = Number(rec.budgetSet) > 0 ? `RM ${Number(rec.budgetSet).toFixed(2)}` : "—";
+          const spentVal = Number(rec.totalSpent || 0).toFixed(2);
+          const isOver = Number(rec.budgetSet) > 0 && Number(rec.totalSpent) > Number(rec.budgetSet);
+
+          tableHtml += `
+            <tr class="hover:bg-slate-50">
+              <td class="py-2.5 px-1 font-semibold text-slate-800">${rec.displayDate || "—"}</td>
+              <td class="py-2.5 px-1 text-center text-slate-500 font-medium">${itemCount}</td>
+              <td class="py-2.5 px-1 text-right text-slate-400">${budgetVal}</td>
+              <td class="py-2.5 px-1 text-right font-bold ${isOver ? 'text-rose-600' : 'text-emerald-600'}">
+                RM ${spentVal}
+              </td>
+            </tr>
+          `;
+        });
+
+        tableHtml += `</tbody></table>`;
+        container.innerHTML = tableHtml;
       }
     }
   </script>

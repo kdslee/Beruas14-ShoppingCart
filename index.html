@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>House Groceries</title>
+  <!-- Mobile PWA tags for iOS and Android -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Groceries" />
+  <meta name="theme-color" content="#059669" />
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 font-sans pb-32">
+
+  <!-- PIN LOCK OVERLAY -->
+  <div id="pinOverlay" class="fixed inset-0 bg-slate-900/90 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl p-6 max-w-xs w-full text-center shadow-2xl space-y-4">
+      <div class="text-4xl">🔒</div>
+      <h2 class="text-lg font-bold text-slate-800">Household PIN</h2>
+      <p class="text-xs text-slate-500">Enter your 4-digit household code to access this list.</p>
+      <input id="pinInputField" type="password" maxlength="6" inputmode="numeric" placeholder="Enter PIN"
+             class="w-full text-center tracking-widest text-2xl font-bold border border-slate-300 rounded-xl py-2 focus:outline-emerald-500" />
+      <button onclick="verifyPin()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-sm transition">
+        Unlock App
+      </button>
+      <p id="pinError" class="text-xs text-rose-500 font-semibold hidden">Incorrect PIN. Try again.</p>
+    </div>
+  </div>
+
+  <!-- MAIN APP CONTAINER -->
+  <div id="appContainer" class="hidden">
+    <!-- Top Bar -->
+    <header class="bg-emerald-600 text-white px-4 py-3.5 sticky top-0 shadow-md z-10 flex justify-between items-center">
+      <div>
+        <h1 class="text-base font-extrabold tracking-tight">🛒 House Groceries</h1>
+        <p class="text-[10px] text-emerald-100 uppercase tracking-widest font-semibold">Live Budget Sync</p>
+      </div>
+      <button onclick="clearCompleted()" class="text-xs bg-emerald-700 hover:bg-emerald-800 active:scale-95 px-3 py-1.5 rounded-lg font-semibold transition">
+        Clear Done
+      </button>
+    </header>
+
+    <main class="max-w-md mx-auto p-4 space-y-4">
+      <!-- Budget Input Card -->
+      <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between">
+        <div>
+          <span class="text-xs font-bold text-slate-500 uppercase tracking-wider block">Target Budget</span>
+          <span class="text-[11px] text-slate-400">Total spending ceiling</span>
+        </div>
+        <div class="flex items-center space-x-1">
+          <span class="text-slate-400 font-bold">$</span>
+          <input id="budgetInput" type="number" step="0.01" placeholder="0.00" onchange="updateBudget(this.value)"
+                 class="w-24 border border-slate-300 rounded-xl px-2.5 py-1.5 text-right font-extrabold text-slate-800 focus:outline-emerald-500" />
+        </div>
+      </div>
+
+      <!-- Add Item Input -->
+      <form onsubmit="addItem(event)" class="flex gap-2">
+        <input id="itemInput" type="text" placeholder="Add grocery item (e.g., Milk)..." required
+               class="flex-1 border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm shadow-sm focus:outline-emerald-500 bg-white" />
+        <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold px-4 py-2.5 rounded-xl text-sm shadow transition">
+          + Add
+        </button>
+      </form>
+
+      <!-- Grocery List -->
+      <div id="itemList" class="space-y-2">
+        <div class="text-center py-10 text-slate-400 text-xs font-medium">Loading grocery list...</div>
+      </div>
+    </main>
+
+    <!-- Sticky Bottom Budget Bar -->
+    <div id="budgetBar" class="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-white border-t border-slate-200 shadow-2xl transition-all duration-300">
+      <div class="flex justify-between items-center">
+        <div>
+          <p class="text-[10px] text-slate-400 uppercase font-black tracking-wider">Cart Total</p>
+          <p id="totalDisplay" class="text-2xl font-black text-slate-900 leading-tight">$0.00</p>
+        </div>
+        <div class="text-right">
+          <p id="budgetStatusLabel" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Remaining</p>
+          <p id="remainingDisplay" class="text-lg font-black text-emerald-600 leading-tight">—</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase Integration -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+    import { 
+      getDatabase, ref, push, set, update, remove, onValue, get, query, orderByChild, endAt 
+    } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
+
+    // 1. CHANGE THIS TO YOUR HOUSEHOLD CODE:
+    const HOUSEHOLD_PIN = "1414";
+
+    // 2. PASTE YOUR EXACT FIREBASE CONFIG HERE:
+    const firebaseConfig = {
+      apiKey: "AIzaSyDf6M_EKU68d9NkuCwPhgeEIdh5izXFOdQ",
+      authDomain: "beruas-14-shopping-web-app.firebaseapp.com",
+      databaseURL: "https://beruas-14-shopping-web-app-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "beruas-14-shopping-web-app",
+      storageBucket: "beruas-14-shopping-web-app.firebasestorage.app",
+      messagingSenderId: "395307163932",
+      appId: "1:395307163932:web:5515c8cd9706cbafa99ad9"
+    };
+
+    // PIN Authentication Handler
+    window.verifyPin = () => {
+      const input = document.getElementById("pinInputField").value.trim();
+      if (input === HOUSEHOLD_PIN) {
+        localStorage.setItem("grocery_unlocked", "true");
+        document.getElementById("pinOverlay").classList.add("hidden");
+        document.getElementById("appContainer").classList.remove("hidden");
+        startApp();
+      } else {
+        document.getElementById("pinError").classList.remove("hidden");
+      }
+    };
+
+    // Auto-login if previously verified on this device
+    if (localStorage.getItem("grocery_unlocked") === "true") {
+      document.getElementById("pinOverlay").classList.add("hidden");
+      document.getElementById("appContainer").classList.remove("hidden");
+      startApp();
+    }
+
+    function startApp() {
+      const app = initializeApp(firebaseConfig);
+      const db = getDatabase(app);
+
+      const itemsRef = ref(db, "groceries/items");
+      const budgetRef = ref(db, "groceries/budget");
+
+      let currentItems = {};
+      let currentBudget = 0;
+
+      // Realtime listener for budget limit
+      onValue(budgetRef, (snapshot) => {
+        currentBudget = snapshot.val() || 0;
+        document.getElementById("budgetInput").value = currentBudget > 0 ? currentBudget : "";
+        calculateTotals();
+      });
+
+      // Realtime listener for grocery items
+      onValue(itemsRef, (snapshot) => {
+        currentItems = snapshot.val() || {};
+        renderItems();
+        calculateTotals();
+      });
+
+      // Automatically purge items completed > 30 days ago
+      function purgeOldCompletedItems() {
+        const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+        const cutoffTime = Date.now() - THIRTY_DAYS_MS;
+
+        const expiredQuery = query(itemsRef, orderByChild("completedAt"), endAt(cutoffTime));
+        get(expiredQuery).then((snapshot) => {
+          if (snapshot.exists()) {
+            const updates = {};
+            snapshot.forEach((child) => {
+              updates[`groceries/items/${child.key}`] = null;
+            });
+            update(ref(db), updates);
+          }
+        }).catch(() => {});
+      }
+      purgeOldCompletedItems();
+
+      // UI Actions
+      window.updateBudget = (val) => {
+        const num = parseFloat(val) || 0;
+        set(budgetRef, num);
+      };
+
+      window.addItem = (e) => {
+        e.preventDefault();
+        const input = document.getElementById("itemInput");
+        const name = input.value.trim();
+        if (!name) return;
+        const newItemRef = push(itemsRef);
+        set(newItemRef, { 
+          name: name, 
+          checked: false, 
+          price: 0, 
+          completedAt: null 
+        });
+        input.value = "";
+      };
+
+      window.toggleCheck = (id, currentVal) => {
+        const nextVal = !currentVal;
+        update(ref(db, `groceries/items/${id}`), {
+          checked: nextVal,
+          completedAt: nextVal ? Date.now() : null
+        });
+      };
+
+      window.updatePrice = (id, val) => {
+        const price = parseFloat(val) || 0;
+        update(ref(db, `groceries/items/${id}`), { price: price });
+      };
+
+      window.deleteItem = (id) => {
+        remove(ref(db, `groceries/items/${id}`));
+      };
+
+      window.clearCompleted = () => {
+        Object.keys(currentItems).forEach((id) => {
+          if (currentItems[id].checked) {
+            remove(ref(db, `groceries/items/${id}`));
+          }
+        });
+      };
+
+      function renderItems() {
+        const listEl = document.getElementById("itemList");
+        const entries = Object.entries(currentItems);
+
+        if (entries.length === 0) {
+          listEl.innerHTML = `<div class="text-center py-12 text-slate-400 text-xs font-semibold">Your list is empty. Add items above!</div>`;
+          return;
+        }
+
+        listEl.innerHTML = "";
+        entries.forEach(([id, item]) => {
+          const div = document.createElement("div");
+          div.className = `flex items-center justify-between p-3 rounded-2xl border transition-all ${
+            item.checked ? "bg-emerald-50 border-emerald-300" : "bg-white border-slate-200 shadow-sm"
+          }`;
+
+          div.innerHTML = `
+            <div class="flex items-center space-x-3 flex-1 overflow-hidden pr-2">
+              <input type="checkbox" ${item.checked ? "checked" : ""} onchange="toggleCheck('${id}', ${item.checked})"
+                     class="w-5 h-5 accent-emerald-600 rounded-md cursor-pointer" />
+              <span class="text-sm font-semibold truncate ${item.checked ? "line-through text-slate-400" : "text-slate-800"}">
+                ${item.name}
+              </span>
+            </div>
+            <div class="flex items-center space-x-2">
+              <div class="relative w-20">
+                <span class="absolute left-2 top-2 text-xs text-slate-400 font-bold">$</span>
+                <input type="number" step="0.01" placeholder="0.00" value="${item.price > 0 ? item.price : ""}"
+                       onchange="updatePrice('${id}', this.value)"
+                       class="w-full text-right text-xs font-bold border border-slate-300 rounded-xl py-2 pr-2.5 pl-4 focus:outline-emerald-500 bg-white" />
+              </div>
+              <button onclick="deleteItem('${id}')" class="text-slate-300 hover:text-rose-500 active:scale-95 p-1 font-bold">✕</button>
+            </div>
+          `;
+          listEl.appendChild(div);
+        });
+      }
+
+      function calculateTotals() {
+        let total = 0;
+        Object.values(currentItems).forEach((item) => {
+          if (item.checked && item.price) {
+            total += Number(item.price);
+          }
+        });
+
+        document.getElementById("totalDisplay").textContent = `$${total.toFixed(2)}`;
+        const bar = document.getElementById("budgetBar");
+        const remDisplay = document.getElementById("remainingDisplay");
+        const statusLabel = document.getElementById("budgetStatusLabel");
+
+        if (currentBudget > 0) {
+          const diff = currentBudget - total;
+          if (diff < 0) {
+            bar.className = "fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-rose-50 border-t-2 border-rose-500 shadow-2xl transition-all duration-300";
+            statusLabel.textContent = "Over Budget";
+            statusLabel.className = "text-[10px] font-black text-rose-600 uppercase tracking-wider";
+            remDisplay.textContent = `+$${Math.abs(diff).toFixed(2)}`;
+            remDisplay.className = "text-lg font-black text-rose-600 leading-tight";
+          } else {
+            bar.className = "fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-white border-t border-slate-200 shadow-2xl transition-all duration-300";
+            statusLabel.textContent = "Remaining";
+            statusLabel.className = "text-[10px] font-bold text-slate-400 uppercase tracking-wider";
+            remDisplay.textContent = `$${diff.toFixed(2)}`;
+            remDisplay.className = "text-lg font-black text-emerald-600 leading-tight";
+          }
+        } else {
+          bar.className = "fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-white border-t border-slate-200 shadow-2xl transition-all duration-300";
+          statusLabel.textContent = "Remaining";
+          statusLabel.className = "text-[10px] font-bold text-slate-400 uppercase tracking-wider";
+          remDisplay.textContent = "—";
+          remDisplay.className = "text-lg font-black text-slate-400 leading-tight";
+        }
+      }
+    }
+  </script>
+</body>
+</html>
